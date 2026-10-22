@@ -10,7 +10,6 @@ if (!fs.existsSync(dataDir)) {
 const dbPath = path.join(dataDir, 'campussathi.db');
 export const db = new DatabaseSync(dbPath);
 
-// Initialize database tables
 export function initDb() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS meta (
@@ -27,7 +26,10 @@ export function initDb() {
       course TEXT DEFAULT '',
       year TEXT DEFAULT '1st Year',
       semester TEXT DEFAULT 'Sem 1',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      role TEXT DEFAULT 'student',
+      is_verified INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS profiles (
@@ -37,10 +39,11 @@ export function initDb() {
       theme TEXT DEFAULT 'light',
       default_language TEXT DEFAULT 'en',
       daily_goal_minutes INTEGER DEFAULT 45,
-      xp INTEGER DEFAULT 120,
+      xp INTEGER DEFAULT 0,
       level INTEGER DEFAULT 1,
-      streak_days INTEGER DEFAULT 3,
-      longest_streak INTEGER DEFAULT 5,
+      streak_days INTEGER DEFAULT 0,
+      longest_streak INTEGER DEFAULT 0,
+      campus_coins INTEGER DEFAULT 0,
       last_active_date TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
@@ -223,7 +226,6 @@ export function initDb() {
       UNIQUE(user_id, badge_key)
     );
 
-    -- Startup Module: Campus Notes Marketplace
     CREATE TABLE IF NOT EXISTS notes_library (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -268,7 +270,6 @@ export function initDb() {
       UNIQUE(user_id, note_id)
     );
 
-    -- Startup Module: Campus Print Hub
     CREATE TABLE IF NOT EXISTS print_orders (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -290,7 +291,6 @@ export function initDb() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
-    -- Startup Module: English & Placement AI Coach
     CREATE TABLE IF NOT EXISTS english_conversations (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -303,7 +303,6 @@ export function initDb() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
-    -- Startup Module: Teacher & Faculty Management
     CREATE TABLE IF NOT EXISTS teacher_classes (
       id TEXT PRIMARY KEY,
       teacher_id TEXT NOT NULL,
@@ -331,45 +330,30 @@ export function initDb() {
       FOREIGN KEY (class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
       FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
+    CREATE INDEX IF NOT EXISTS idx_chunks_user_doc ON chunks(user_id, document_id);
+    CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_flashcards_user_due ON flashcards(user_id, due_date);
+    CREATE INDEX IF NOT EXISTS idx_plans_user ON plans(user_id);
   `);
 
-  // Migration: Add role and campus_coins if missing
   try {
     db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'student';`);
   } catch {
-    // Column already exists
+    // no-op: column already exists
   }
 
   try {
-    db.exec(`ALTER TABLE profiles ADD COLUMN campus_coins INTEGER DEFAULT 150;`);
+    db.exec(`ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0;`);
   } catch {
-    // Column already exists
+    // no-op
   }
 
   try {
-    const dummyHash = 'dummy_hash_toppers';
-    const authors = [
-      { id: 'user_priya', name: 'Priya Sharma (Rank 1)', email: 'priya@aktu.ac.in', college: 'AKTU' },
-      { id: 'user_ananya', name: 'Ananya Deshmukh', email: 'ananya@vtu.ac.in', college: 'VTU' },
-      { id: 'user_rohit', name: 'Rohit Verma', email: 'rohit@dtu.ac.in', college: 'DTU' },
-      { id: 'user_kunal', name: 'Kunal Patel', email: 'kunal@pune.ac.in', college: 'Pune University' }
-    ];
-
-    for (const a of authors) {
-      db.prepare(`
-        INSERT OR IGNORE INTO users (id, email, password_hash, name, college, course, year, semester)
-        VALUES (?, ?, ?, ?, ?, 'B.Tech CSE', 'Final Year', 'Sem 8')
-      `).run(a.id, a.email, dummyHash, a.name, a.college);
-    }
-
-    db.exec(`
-      UPDATE notes_library SET user_id = 'user_priya' WHERE id = 'note_os_topper';
-      UPDATE notes_library SET user_id = 'user_ananya' WHERE id = 'note_dbms_gate';
-      UPDATE notes_library SET user_id = 'user_rohit' WHERE id = 'note_dsa_quick';
-      UPDATE notes_library SET user_id = 'user_kunal' WHERE id = 'note_cn_protocols';
-    `);
-  } catch (e) {
-    console.warn('Author migration warning:', e);
+    db.exec(`ALTER TABLE profiles ADD COLUMN campus_coins INTEGER DEFAULT 0;`);
+  } catch {
+    // no-op
   }
 }
-

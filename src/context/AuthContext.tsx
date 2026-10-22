@@ -19,35 +19,43 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('campussathi_token'));
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchCurrentUser = async (authToken?: string) => {
     try {
       const activeToken = authToken || token;
       const headers: Record<string, string> = {};
-      if (activeToken) {
-        headers['Authorization'] = `Bearer ${activeToken}`;
-      }
+      if (activeToken) headers.Authorization = `Bearer ${activeToken}`;
+
       const res = await fetch('/api/me', { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-        setProfile(data.profile);
-      } else {
-        // Fallback to demo login if first time
-        await loginAsDemo();
+      if (!res.ok) {
+        setUser(null);
+        setProfile(null);
+        localStorage.removeItem('campussathi_token');
+        setToken(null);
+        return;
       }
-    } catch (err) {
-      console.warn('Failed to load user, trying demo login:', err);
-      await loginAsDemo();
+
+      const data = await res.json();
+      setUser(data.user);
+      setProfile(data.profile);
+    } catch {
+      setUser(null);
+      setProfile(null);
+      localStorage.removeItem('campussathi_token');
+      setToken(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCurrentUser();
+    const savedToken = localStorage.getItem('campussathi_token');
+    if (savedToken) {
+      setToken(savedToken);
+    }
+    fetchCurrentUser(savedToken || undefined);
   }, []);
 
   const login = async (email: string, pass: string) => {
@@ -55,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pass })
+        body: JSON.stringify({ email, password: pass }),
       });
       const data = await res.json();
       if (res.ok && data.token) {
@@ -76,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       });
       const data = await res.json();
       if (res.ok && data.token) {
@@ -93,23 +101,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginAsDemo = async () => {
-    try {
-      const res = await fetch('/api/auth/demo', { method: 'POST' });
-      const data = await res.json();
-      if (data.token) {
-        setToken(data.token);
-        localStorage.setItem('campussathi_token', data.token);
-        setUser(data.user);
-        const meRes = await fetch('/api/me', { headers: { Authorization: `Bearer ${data.token}` } });
-        if (meRes.ok) {
-          const meData = await meRes.json();
-          setUser(meData.user);
-          setProfile(meData.profile);
-        }
-      }
-    } catch (err) {
-      console.error('Demo login error:', err);
-    }
+    // Demo mode intentionally disabled in real app mode.
+    return;
   };
 
   const logout = async () => {
@@ -117,10 +110,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token) {
         await fetch('/api/auth/logout', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
       }
-    } catch {}
+    } catch {
+      // ignore network error during logout
+    }
     localStorage.removeItem('campussathi_token');
     setToken(null);
     setUser(null);
@@ -128,18 +123,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProfileLocally = (userPartial?: Partial<User>, profilePartial?: Partial<Profile>) => {
-    if (userPartial && user) {
-      setUser({ ...user, ...userPartial });
-    }
-    if (profilePartial && profile) {
-      setProfile({ ...profile, ...profilePartial });
-    }
+    if (userPartial && user) setUser({ ...user, ...userPartial });
+    if (profilePartial && profile) setProfile({ ...profile, ...profilePartial });
   };
 
   const refreshUserData = async () => {
-    if (token) {
-      await fetchCurrentUser(token);
-    }
+    if (token) await fetchCurrentUser(token);
   };
 
   return (
@@ -153,7 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loginAsDemo,
       logout,
       updateProfileLocally,
-      refreshUserData
+      refreshUserData,
     }}>
       {children}
     </AuthContext.Provider>

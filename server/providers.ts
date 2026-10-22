@@ -37,20 +37,14 @@ export class MultiAIProvider {
 
   public getGeminiClient(): GoogleGenAI | null {
     const key = process.env.GEMINI_API_KEY || this.geminiKey;
-    if (!key || key === 'MY_GEMINI_API_KEY') {
+    if (!key || key === 'MY_GEMINI_API_KEY' || key === 'MY_API_KEY') {
       return null;
     }
+
     if (!this.geminiClient || this.geminiKey !== key) {
       this.geminiKey = key;
       try {
-        this.geminiClient = new GoogleGenAI({
-          apiKey: key,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            }
-          }
-        });
+        this.geminiClient = new GoogleGenAI({ apiKey: key });
       } catch (err) {
         console.error('Failed to initialize Gemini client:', err);
         this.geminiClient = null;
@@ -59,61 +53,53 @@ export class MultiAIProvider {
     return this.geminiClient;
   }
 
-  public classifyError(err: any): { errorKind: 'NO_KEY' | 'QUOTA_EXCEEDED' | 'MODEL_NOT_FOUND' | 'TIMEOUT' | 'UNKNOWN', message: string, fixHint: string } {
+  public classifyError(err: any): { errorKind: 'NO_KEY' | 'QUOTA_EXCEEDED' | 'MODEL_NOT_FOUND' | 'TIMEOUT' | 'UNKNOWN'; message: string; fixHint: string } {
     const msg = String(err?.message || err || '');
     if (msg.includes('API_KEY_INVALID') || msg.includes('401') || msg.includes('authentication') || msg.includes('Invalid API Key')) {
       return {
         errorKind: 'NO_KEY',
-        message: 'Invalid or missing API key',
-        fixHint: 'Please check your GEMINI_API_KEY or GROQ_API_KEY in the environment or secrets panel.'
+        message: 'Invalid or missing API key.',
+        fixHint: 'Set GEMINI_API_KEY or GROQ_API_KEY in your .env file.'
       };
     }
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('Rate limit')) {
       return {
         errorKind: 'QUOTA_EXCEEDED',
-        message: 'API rate limit or quota exceeded',
-        fixHint: 'The free tier quota is temporarily busy. Wait a few seconds or configure a backup key.'
+        message: 'API quota was exhausted.',
+        fixHint: 'Wait a bit or use a different API key.'
       };
     }
     if (msg.includes('404') || msg.includes('not found') || msg.includes('model')) {
       return {
         errorKind: 'MODEL_NOT_FOUND',
-        message: 'Requested AI model was not found',
-        fixHint: 'Check model name in .env settings. The app will automatically try alternate models.'
+        message: 'Requested AI model could not be found.',
+        fixHint: 'Check your model names in .env and try again.'
       };
     }
     if (msg.includes('timeout') || msg.includes('ETIMEDOUT') || msg.includes('abort')) {
       return {
         errorKind: 'TIMEOUT',
-        message: 'The AI request timed out after 90 seconds',
-        fixHint: 'Please try breaking down your question or prompt into smaller parts.'
+        message: 'AI request timed out.',
+        fixHint: 'Retry with a smaller prompt or a more stable network.'
       };
     }
     return {
       errorKind: 'UNKNOWN',
-      message: msg || 'An unexpected AI provider error occurred',
-      fixHint: 'Check internet connection and service status.'
+      message: msg || 'An unexpected AI provider error occurred.',
+      fixHint: 'Check your API keys and network connection.'
     };
   }
 
-  // Probe live models
-  public async probe(): Promise<{
-    gemini: { status: 'OK' | 'FAIL'; model: string; error?: string };
-    groq: { status: 'OK' | 'FAIL'; model: string; error?: string };
-  }> {
+  public async probe(): Promise<{ gemini: { status: 'OK' | 'FAIL'; model: string; error?: string }; groq: { status: 'OK' | 'FAIL'; model: string; error?: string } }> {
     const result = {
       gemini: { status: 'FAIL' as 'OK' | 'FAIL', model: this.geminiModel, error: undefined as string | undefined },
       groq: { status: 'FAIL' as 'OK' | 'FAIL', model: this.groqModel, error: undefined as string | undefined },
     };
 
-    // Test Gemini
     const gemini = this.getGeminiClient();
     if (gemini) {
       try {
-        const response = await gemini.models.generateContent({
-          model: this.geminiModel,
-          contents: 'Say OK',
-        });
+        const response = await gemini.models.generateContent({ model: this.geminiModel, contents: 'Say OK' });
         if (response && response.text) {
           result.gemini.status = 'OK';
         }
@@ -121,23 +107,18 @@ export class MultiAIProvider {
         result.gemini.error = err.message || 'Gemini probe failed';
       }
     } else {
-      result.gemini.error = 'GEMINI_API_KEY not configured or set to placeholder';
+      result.gemini.error = 'GEMINI_API_KEY is not configured.';
     }
 
-    // Test Groq
     if (this.groqKey) {
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.groqKey}`
+            Authorization: `Bearer ${this.groqKey}`,
           },
-          body: JSON.stringify({
-            model: this.groqModel,
-            messages: [{ role: 'user', content: 'Say OK' }],
-            max_tokens: 5
-          })
+          body: JSON.stringify({ model: this.groqModel, messages: [{ role: 'user', content: 'Say OK' }], max_tokens: 5 }),
         });
         if (res.ok) {
           result.groq.status = 'OK';
@@ -149,53 +130,41 @@ export class MultiAIProvider {
         result.groq.error = err.message || 'Groq connection failed';
       }
     } else {
-      result.groq.error = 'GROQ_API_KEY not provided (Gemini will be used)';
+      result.groq.error = 'GROQ_API_KEY is not configured.';
     }
 
     return result;
   }
 
-  // Generate Text with Groq primary and Gemini fallback
-  public async generateText(
-    messages: ChatMessageParam[],
-    systemInstruction?: string,
-    preferredProvider: 'groq' | 'gemini' = 'groq'
-  ): Promise<AIProviderResult<string>> {
-    // Attempt 1: preferred provider
+  public async generateText(messages: ChatMessageParam[], systemInstruction?: string, preferredProvider: 'groq' | 'gemini' = 'groq'): Promise<AIProviderResult<string>> {
     if (preferredProvider === 'groq' && this.groqKey) {
       try {
-        const groqResult = await this.callGroqChat(messages, systemInstruction);
         return {
           success: true,
-          data: groqResult,
+          data: await this.callGroqChat(messages, systemInstruction),
           provider: 'groq',
-          modelUsed: this.groqModel
+          modelUsed: this.groqModel,
         };
       } catch (err) {
-        console.warn('Groq failed, attempting Gemini fallback:', err);
+        console.warn('Groq chat failed, trying Gemini fallback:', err);
       }
     }
 
-    // Attempt 2: Gemini
     const gemini = this.getGeminiClient();
     if (gemini) {
       try {
         const fullPrompt = [
           systemInstruction ? `[SYSTEM INSTRUCTION]\n${systemInstruction}\n` : '',
-          ...messages.map(m => `${m.role.toUpperCase()}: ${m.content}`)
+          ...messages.map(m => `${m.role.toUpperCase()}: ${m.content}`),
         ].join('\n\n');
 
-        const response = await gemini.models.generateContent({
-          model: this.geminiModel,
-          contents: fullPrompt
-        });
-
+        const response = await gemini.models.generateContent({ model: this.geminiModel, contents: fullPrompt });
         const text = response.text?.trim() || '';
         return {
           success: true,
           data: text,
           provider: 'gemini',
-          modelUsed: this.geminiModel
+          modelUsed: this.geminiModel,
         };
       } catch (geminiErr: any) {
         const classified = this.classifyError(geminiErr);
@@ -205,7 +174,7 @@ export class MultiAIProvider {
           modelUsed: this.geminiModel,
           error: classified.message,
           errorKind: classified.errorKind,
-          fixHint: classified.fixHint
+          fixHint: classified.fixHint,
         };
       }
     }
@@ -214,35 +183,21 @@ export class MultiAIProvider {
       success: false,
       provider: 'gemini',
       modelUsed: this.geminiModel,
-      error: 'No active AI key available (GEMINI_API_KEY or GROQ_API_KEY)',
+      error: 'No active AI key available (GEMINI_API_KEY or GROQ_API_KEY).',
       errorKind: 'NO_KEY',
-      fixHint: 'Configure GEMINI_API_KEY in the environment or secrets panel to enable real AI generation.'
+      fixHint: 'Set the required API keys in .env to enable AI features.',
     };
   }
 
-  // Generate Structured JSON
-  public async generateJson<T = any>(
-    prompt: string,
-    systemInstruction?: string,
-    preferredProvider: 'groq' | 'gemini' = 'groq'
-  ): Promise<AIProviderResult<T>> {
-    const formattedPrompt = `${prompt}\n\nIMPORTANT: Return ONLY a valid JSON object or array. No markdown code blocks, no backticks, no explanations.`;
-
-    const result = await this.generateText(
-      [{ role: 'user', content: formattedPrompt }],
-      systemInstruction,
-      preferredProvider
-    );
+  public async generateJson<T = any>(prompt: string, systemInstruction?: string, preferredProvider: 'groq' | 'gemini' = 'groq'): Promise<AIProviderResult<T>> {
+    const formattedPrompt = `${prompt}\n\nIMPORTANT: Return ONLY valid JSON. No markdown fences.`;
+    const result = await this.generateText([{ role: 'user', content: formattedPrompt }], systemInstruction, preferredProvider);
 
     if (!result.success || !result.data) {
-      return {
-        ...result,
-        data: undefined
-      };
+      return { ...result, data: undefined };
     }
 
     try {
-      // Clean up json text if model included markdown fences
       let raw = result.data.trim();
       if (raw.startsWith('```json')) {
         raw = raw.replace(/^```json/, '').replace(/```$/, '').trim();
@@ -254,62 +209,44 @@ export class MultiAIProvider {
         success: true,
         data: parsed,
         provider: result.provider,
-        modelUsed: result.modelUsed
+        modelUsed: result.modelUsed,
       };
-    } catch (parseErr) {
+    } catch {
       return {
         success: false,
         provider: result.provider,
         modelUsed: result.modelUsed,
-        error: 'Model did not return valid JSON syntax',
+        error: 'Model did not return valid JSON syntax.',
         errorKind: 'UNKNOWN',
-        fixHint: 'Retry the generation with slightly simpler requirements.'
+        fixHint: 'Retry with a simpler prompt or a shorter task.',
       };
     }
   }
 
-  // Vision OCR / Describe image (Gemini primary)
-  public async describeImage(
-    imageBase64: string,
-    mimeType: string,
-    prompt: string
-  ): Promise<AIProviderResult<string>> {
+  public async describeImage(imageBase64: string, mimeType: string, prompt: string): Promise<AIProviderResult<string>> {
     const gemini = this.getGeminiClient();
     if (!gemini) {
       return {
         success: false,
         provider: 'gemini',
         modelUsed: this.geminiModel,
-        error: 'Gemini API key is required for image and vision OCR processing.',
+        error: 'Gemini API key is required for image OCR.',
         errorKind: 'NO_KEY',
-        fixHint: 'Set GEMINI_API_KEY in your environment to process handwritten notes and images.'
+        fixHint: 'Set GEMINI_API_KEY in your environment to process images.',
       };
     }
 
     try {
       const response = await gemini.models.generateContent({
         model: this.geminiModel,
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                inlineData: {
-                  mimeType,
-                  data: imageBase64
-                }
-              },
-              { text: prompt }
-            ]
-          }
-        ]
+        contents: [{ role: 'user', parts: [{ inlineData: { mimeType, data: imageBase64 } }, { text: prompt }] }],
       });
 
       return {
         success: true,
         data: response.text?.trim() || '',
         provider: 'gemini',
-        modelUsed: this.geminiModel
+        modelUsed: this.geminiModel,
       };
     } catch (err: any) {
       const classified = this.classifyError(err);
@@ -319,17 +256,12 @@ export class MultiAIProvider {
         modelUsed: this.geminiModel,
         error: classified.message,
         errorKind: classified.errorKind,
-        fixHint: classified.fixHint
+        fixHint: classified.fixHint,
       };
     }
   }
 
-  // Audio transcription (Groq Whisper primary)
-  public async transcribe(
-    audioBuffer: Buffer,
-    mimeType: string,
-    languageHint: string = 'en'
-  ): Promise<AIProviderResult<string>> {
+  public async transcribe(audioBuffer: Buffer, mimeType: string, languageHint: string = 'en'): Promise<AIProviderResult<string>> {
     if (this.groqKey) {
       try {
         const formData = new FormData();
@@ -342,10 +274,8 @@ export class MultiAIProvider {
 
         const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.groqKey}`
-          },
-          body: formData
+          headers: { Authorization: `Bearer ${this.groqKey}` },
+          body: formData,
         });
 
         if (res.ok) {
@@ -354,11 +284,11 @@ export class MultiAIProvider {
             success: true,
             data: json.text || '',
             provider: 'groq',
-            modelUsed: this.groqSttModel
+            modelUsed: this.groqSttModel,
           };
         }
       } catch (err) {
-        console.warn('Groq STT failed, falling back:', err);
+        console.warn('Groq STT failed:', err);
       }
     }
 
@@ -366,13 +296,12 @@ export class MultiAIProvider {
       success: false,
       provider: 'groq',
       modelUsed: this.groqSttModel,
-      error: 'Speech-to-text service unavailable. Use text fallback to answer.',
+      error: 'Speech-to-text service is unavailable. Please type your answer instead.',
       errorKind: 'NO_KEY',
-      fixHint: 'Configure GROQ_API_KEY with whisper-large-v3-turbo, or use the interactive keyboard input.'
+      fixHint: 'Set GROQ_API_KEY to enable voice transcription.',
     };
   }
 
-  // Embed text
   public async embed(text: string): Promise<AIProviderResult<number[]>> {
     const cleanText = (text || '').trim();
     if (!cleanText) {
@@ -380,69 +309,62 @@ export class MultiAIProvider {
         success: false,
         provider: 'fallback_keyword',
         modelUsed: 'keyword-frequency',
-        error: 'Empty text provided for embedding.'
+        error: 'Empty text provided for embedding.',
       };
     }
 
     const gemini = this.getGeminiClient();
-    if (gemini) {
-      const candidateModels = Array.from(new Set([
-        this.geminiEmbeddingModel,
-        'gemini-embedding-2-preview',
-        'gemini-embedding-001'
-      ])).filter(Boolean);
+    if (!gemini) {
+      return {
+        success: false,
+        provider: 'fallback_keyword',
+        modelUsed: 'keyword-frequency',
+        error: 'Embedding unavailable because GEMINI_API_KEY is not configured.',
+        errorKind: 'NO_KEY',
+        fixHint: 'Add GEMINI_API_KEY in .env to enable PDF embeddings.',
+      };
+    }
 
-      for (const model of candidateModels) {
-        try {
-          const res: any = await gemini.models.embedContent({
-            model,
-            contents: cleanText
-          });
-          const values = res.embedding?.values || res.embeddings?.[0]?.values;
-          if (Array.isArray(values) && values.length > 0) {
-            return {
-              success: true,
-              data: values,
-              provider: 'gemini',
-              modelUsed: model
-            };
-          }
-        } catch (err: any) {
-          // Log informative debug message and continue cascade
-          console.warn(`Gemini embedding with model ${model} failed (${err?.message || err}), trying fallback`);
+    const candidateModels = Array.from(new Set([this.geminiEmbeddingModel, 'text-embedding-004', 'gemini-embedding-001'])).filter(Boolean);
+    for (const model of candidateModels) {
+      try {
+        const res: any = await gemini.models.embedContent({ model, contents: cleanText });
+        const values = res.embedding?.values || res.embeddings?.[0]?.values;
+        if (Array.isArray(values) && values.length > 0) {
+          return {
+            success: true,
+            data: values,
+            provider: 'gemini',
+            modelUsed: model,
+          };
         }
+      } catch (err: any) {
+        console.warn(`Embedding failed with ${model}:`, err?.message || err);
       }
-      console.warn('Gemini embedding failed, using keyword fallback');
     }
 
     return {
       success: false,
       provider: 'fallback_keyword',
       modelUsed: 'keyword-frequency',
-      error: 'Vector embedding unavailable; falling back to hybrid BM25/keyword retrieval.'
+      error: 'No usable embedding model responded.',
+      errorKind: 'UNKNOWN',
+      fixHint: 'Check your Gemini configuration and model availability.',
     };
   }
 
   private async callGroqChat(messages: ChatMessageParam[], systemInstruction?: string): Promise<string> {
     const formattedMessages: any[] = [];
-    if (systemInstruction) {
-      formattedMessages.push({ role: 'system', content: systemInstruction });
-    }
-    for (const m of messages) {
-      formattedMessages.push({ role: m.role, content: m.content });
-    }
+    if (systemInstruction) formattedMessages.push({ role: 'system', content: systemInstruction });
+    for (const m of messages) formattedMessages.push({ role: m.role, content: m.content });
 
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.groqKey}`
+        Authorization: `Bearer ${this.groqKey}`,
       },
-      body: JSON.stringify({
-        model: this.groqModel,
-        messages: formattedMessages,
-        temperature: 0.3
-      })
+      body: JSON.stringify({ model: this.groqModel, messages: formattedMessages, temperature: 0.3 }),
     });
 
     if (!res.ok) {
