@@ -222,5 +222,154 @@ export function initDb() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE(user_id, badge_key)
     );
+
+    -- Startup Module: Campus Notes Marketplace
+    CREATE TABLE IF NOT EXISTS notes_library (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      subject TEXT NOT NULL,
+      branch TEXT DEFAULT 'Computer Science',
+      semester TEXT DEFAULT 'Sem 4',
+      university TEXT DEFAULT 'AKTU',
+      author_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      page_count INTEGER DEFAULT 1,
+      stars REAL DEFAULT 5.0,
+      rating_count INTEGER DEFAULT 1,
+      price INTEGER DEFAULT 0,
+      is_verified INTEGER DEFAULT 0,
+      downloads INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS note_ratings (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      user_name TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      comment TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (note_id) REFERENCES notes_library(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS note_unlocks (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      amount_paid INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (note_id) REFERENCES notes_library(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, note_id)
+    );
+
+    -- Startup Module: Campus Print Hub
+    CREATE TABLE IF NOT EXISTS print_orders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      document_title TEXT NOT NULL,
+      file_path TEXT DEFAULT '',
+      pages INTEGER NOT NULL,
+      copies INTEGER DEFAULT 1,
+      color_mode TEXT DEFAULT 'bw',
+      print_sides TEXT DEFAULT 'double',
+      binding_type TEXT DEFAULT 'staple',
+      hostel_delivery_address TEXT NOT NULL,
+      phone_number TEXT NOT NULL,
+      urgency TEXT DEFAULT 'regular',
+      total_amount REAL NOT NULL,
+      payment_status TEXT DEFAULT 'paid',
+      order_status TEXT DEFAULT 'order_placed',
+      estimated_delivery TEXT DEFAULT 'Tomorrow, 9:00 AM',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    -- Startup Module: English & Placement AI Coach
+    CREATE TABLE IF NOT EXISTS english_conversations (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      mode TEXT DEFAULT 'general_tutor',
+      topic TEXT DEFAULT 'Spoken English & Fluency',
+      messages TEXT NOT NULL,
+      fluency_score INTEGER DEFAULT 82,
+      feedback TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    -- Startup Module: Teacher & Faculty Management
+    CREATE TABLE IF NOT EXISTS teacher_classes (
+      id TEXT PRIMARY KEY,
+      teacher_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      branch TEXT DEFAULT 'Computer Science',
+      semester TEXT DEFAULT 'Sem 4',
+      code TEXT UNIQUE NOT NULL,
+      student_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS teacher_assignments (
+      id TEXT PRIMARY KEY,
+      class_id TEXT NOT NULL,
+      teacher_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      topic TEXT NOT NULL,
+      due_date TEXT NOT NULL,
+      total_marks INTEGER DEFAULT 20,
+      questions TEXT NOT NULL,
+      submissions_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
+      FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
+
+  // Migration: Add role and campus_coins if missing
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'student';`);
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE profiles ADD COLUMN campus_coins INTEGER DEFAULT 150;`);
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    const dummyHash = 'dummy_hash_toppers';
+    const authors = [
+      { id: 'user_priya', name: 'Priya Sharma (Rank 1)', email: 'priya@aktu.ac.in', college: 'AKTU' },
+      { id: 'user_ananya', name: 'Ananya Deshmukh', email: 'ananya@vtu.ac.in', college: 'VTU' },
+      { id: 'user_rohit', name: 'Rohit Verma', email: 'rohit@dtu.ac.in', college: 'DTU' },
+      { id: 'user_kunal', name: 'Kunal Patel', email: 'kunal@pune.ac.in', college: 'Pune University' }
+    ];
+
+    for (const a of authors) {
+      db.prepare(`
+        INSERT OR IGNORE INTO users (id, email, password_hash, name, college, course, year, semester)
+        VALUES (?, ?, ?, ?, ?, 'B.Tech CSE', 'Final Year', 'Sem 8')
+      `).run(a.id, a.email, dummyHash, a.name, a.college);
+    }
+
+    db.exec(`
+      UPDATE notes_library SET user_id = 'user_priya' WHERE id = 'note_os_topper';
+      UPDATE notes_library SET user_id = 'user_ananya' WHERE id = 'note_dbms_gate';
+      UPDATE notes_library SET user_id = 'user_rohit' WHERE id = 'note_dsa_quick';
+      UPDATE notes_library SET user_id = 'user_kunal' WHERE id = 'note_cn_protocols';
+    `);
+  } catch (e) {
+    console.warn('Author migration warning:', e);
+  }
 }
+

@@ -1,5 +1,7 @@
-import React from 'react';
-import { LayoutDashboard, MessageSquareText, HelpCircle, Mic, Calendar, ScanText, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  LayoutDashboard, MessageSquareText, HelpCircle, Mic, Calendar, 
+  ScanText, User, ChevronLeft, ChevronRight, BookOpen, Printer, Sparkles, GraduationCap 
+} from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext.js';
 
 interface SidebarProps {
@@ -20,7 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     {
       id: 'dashboard',
-      label: t('navDashboard'),
+      label: t('navDashboard') || 'Dashboard',
       icon: LayoutDashboard,
       color: 'from-indigo-600 to-violet-600',
       activeText: 'text-indigo-600 dark:text-indigo-400',
@@ -29,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'chat',
-      label: t('navStudyChat'),
+      label: t('navStudyChat') || 'Study Chat',
       icon: MessageSquareText,
       color: 'from-blue-600 to-cyan-500',
       activeText: 'text-blue-600 dark:text-cyan-400',
@@ -37,8 +39,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'RAG'
     },
     {
+      id: 'notes_library',
+      label: 'Notes Library ⭐',
+      icon: BookOpen,
+      color: 'from-amber-500 to-orange-500',
+      activeText: 'text-amber-600 dark:text-orange-400',
+      activeBg: 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800/60',
+      badge: 'Market'
+    },
+    {
+      id: 'printing',
+      label: 'Campus Print 🖨️',
+      icon: Printer,
+      color: 'from-blue-600 to-indigo-600',
+      activeText: 'text-blue-600 dark:text-indigo-400',
+      activeBg: 'bg-blue-50 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800/60',
+      badge: '9 AM'
+    },
+    {
+      id: 'english',
+      label: 'English Coach 🗣️',
+      icon: Sparkles,
+      color: 'from-emerald-600 to-teal-500',
+      activeText: 'text-emerald-600 dark:text-teal-400',
+      activeBg: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800/60',
+      badge: 'Voice'
+    },
+    {
       id: 'quiz',
-      label: t('navQuiz'),
+      label: t('navQuiz') || 'Quiz Arena',
       icon: HelpCircle,
       color: 'from-orange-500 to-amber-500',
       activeText: 'text-orange-600 dark:text-amber-400',
@@ -47,25 +76,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'viva',
-      label: t('navViva'),
+      label: t('navViva') || 'Voice Viva',
       icon: Mic,
       color: 'from-rose-500 to-pink-500',
       activeText: 'text-rose-600 dark:text-pink-400',
       activeBg: 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800/60',
-      badge: 'Voice'
+      badge: 'Audio'
+    },
+    {
+      id: 'teacher_dashboard',
+      label: 'Teacher Portal',
+      icon: GraduationCap,
+      color: 'from-slate-700 to-indigo-800',
+      activeText: 'text-indigo-700 dark:text-indigo-300',
+      activeBg: 'bg-indigo-50/80 dark:bg-indigo-950/80 border-indigo-300 dark:border-indigo-700',
+      badge: 'Faculty'
     },
     {
       id: 'planner',
-      label: t('navPlanner'),
+      label: t('navPlanner') || 'Exam Planner',
       icon: Calendar,
-      color: 'from-emerald-500 to-teal-500',
-      activeText: 'text-emerald-600 dark:text-teal-400',
-      activeBg: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800/60',
+      color: 'from-teal-500 to-emerald-500',
+      activeText: 'text-teal-600 dark:text-emerald-400',
+      activeBg: 'bg-teal-50 dark:bg-teal-950/60 border-teal-200 dark:border-teal-800/60',
       badge: 'Agent'
     },
     {
       id: 'scanner',
-      label: t('navScanner'),
+      label: t('navScanner') || 'Notes Scanner',
       icon: ScanText,
       color: 'from-fuchsia-600 to-purple-500',
       activeText: 'text-fuchsia-600 dark:text-purple-400',
@@ -74,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'profile',
-      label: t('navProfile'),
+      label: t('navProfile') || 'Profile',
       icon: User,
       color: 'from-slate-600 to-slate-800',
       activeText: 'text-slate-800 dark:text-slate-200',
@@ -82,6 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'You'
     }
   ];
+
 
   return (
     <>

@@ -22,6 +22,7 @@ export interface Profile {
   level: number;
   streak_days: number;
   longest_streak: number;
+  stars?: number;
 }
 
 export interface DocumentItem {

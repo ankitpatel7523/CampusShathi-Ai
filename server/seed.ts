@@ -295,5 +295,145 @@ export function seedDemoData() {
     `).run(`act_${idx}`, DEMO_USER_ID, act.type, act.title, act.xp);
   });
 
+  // Seed startup modules
+  seedStartupModules();
+
   console.log('CampusSathi AI demo data seeded successfully!');
 }
+
+export function seedStartupModules() {
+  try {
+    // Check if notes_library already has data
+    const existingNote = db.prepare('SELECT id FROM notes_library LIMIT 1').get();
+    if (!existingNote) {
+      console.log('Seeding Campus Notes Marketplace...');
+      const notes = [
+        {
+          id: 'note_os_topper',
+          userId: 'user_priya',
+          title: 'Operating Systems Complete Handwritten Notes (Unit 1 to 5)',
+          desc: 'Comprehensive color-coded diagrams for Process Scheduling, Deadlocks, Semaphore Banker algorithm, and Virtual Memory. AKTU & RGPV topper notes.',
+          subject: 'Operating Systems',
+          branch: 'Computer Science',
+          sem: 'Sem 4',
+          univ: 'AKTU',
+          author: 'Priya Sharma (Rank 1)',
+          pages: 64,
+          stars: 4.9,
+          ratings: 42,
+          price: 29,
+          verified: 1,
+          downloads: 384
+        },
+        {
+          id: 'note_dsa_quick',
+          userId: 'user_rohit',
+          title: 'DSA Ultimate Cheat Sheet & 50 Most Asked Coding Problems',
+          desc: 'Binary Trees, Graphs (Dijkstra, Prim), DP memoization patterns with time-space complexity tables. Perfect for tech placement rounds.',
+          subject: 'Data Structures & Algorithms',
+          branch: 'Computer Science & IT',
+          sem: 'Sem 3',
+          univ: 'Delhi Tech Univ',
+          author: 'Rohit Verma (Placed @ Microsoft)',
+          pages: 42,
+          stars: 5.0,
+          ratings: 68,
+          price: 0,
+          verified: 1,
+          downloads: 1240
+        },
+        {
+          id: 'note_dbms_gate',
+          userId: 'user_ananya',
+          title: 'DBMS Normalization & SQL Queries Master Guide',
+          desc: '1NF to BCNF step-by-step decomposition, ACID properties, transaction concurrency control, and relational algebra with solved PYQs.',
+          subject: 'Database Management Systems',
+          branch: 'Computer Science',
+          sem: 'Sem 4',
+          univ: 'VTU',
+          author: 'Ananya Deshmukh',
+          pages: 38,
+          stars: 4.8,
+          ratings: 27,
+          price: 19,
+          verified: 0,
+          downloads: 215
+        },
+        {
+          id: 'note_cn_protocols',
+          userId: 'user_kunal',
+          title: 'Computer Networks - OSI, TCP/IP & Subnetting Shortcuts',
+          desc: 'IPv4 vs IPv6, CIDR subnetting calculation tricks in 30 seconds, routing algorithms (Distance Vector vs Link State).',
+          subject: 'Computer Networks',
+          branch: 'CSE / ECE',
+          sem: 'Sem 5',
+          univ: 'Pune Univ',
+          author: 'Kunal Patel',
+          pages: 50,
+          stars: 4.7,
+          ratings: 19,
+          price: 0,
+          verified: 1,
+          downloads: 512
+        }
+      ];
+
+      notes.forEach(n => {
+        db.prepare(`
+          INSERT INTO notes_library (id, user_id, title, description, subject, branch, semester, university, author_name, file_path, page_count, stars, rating_count, price, is_verified, downloads)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(n.id, n.userId, n.title, n.desc, n.subject, n.branch, n.sem, n.univ, n.author, 'notes_demo.pdf', n.pages, n.stars, n.ratings, n.price, n.verified, n.downloads);
+      });
+
+      // Seed reviews
+      db.prepare(`
+        INSERT INTO note_ratings (id, note_id, user_id, user_name, rating, comment)
+        VALUES 
+          ('rev_1', 'note_os_topper', 'user_vikram', 'Vikram Singh', 5, 'Bhai pure semester isse padhke 9.2 SGPA aa gayi! Diagrams are super neat.'),
+          ('rev_2', 'note_os_topper', 'user_neha', 'Neha Gupta', 5, 'Best handwritten notes for sem exams. Banker algorithm proof is crystal clear.'),
+          ('rev_3', 'note_dsa_quick', 'user_akash', 'Akash Mehra', 5, 'Free me itna detailed DP sheet milna impossible tha. Thanks bro!')
+      `).run();
+    }
+
+    // Seed Print Orders
+    const existingOrder = db.prepare('SELECT id FROM print_orders LIMIT 1').get();
+    if (!existingOrder) {
+      console.log('Seeding Campus Print Orders...');
+      db.prepare(`
+        INSERT INTO print_orders (id, user_id, document_title, pages, copies, color_mode, print_sides, binding_type, hostel_delivery_address, phone_number, urgency, total_amount, payment_status, order_status, estimated_delivery)
+        VALUES ('ORD_PRINT_108', ?, 'Operating Systems Lab Manual & Code.pdf', 32, 1, 'bw', 'double', 'spiral', 'Hostel BH-3, Room 214, North Campus', '9876543210', 'express_morning_9am', 49.0, 'paid', 'out_for_delivery', 'Today, 8:45 AM (Hostel Gate)')
+      `).run(DEMO_USER_ID);
+
+      db.prepare(`
+        INSERT INTO print_orders (id, user_id, document_title, pages, copies, color_mode, print_sides, binding_type, hostel_delivery_address, phone_number, urgency, total_amount, payment_status, order_status, estimated_delivery)
+        VALUES ('ORD_PRINT_109', ?, 'DBMS Final Project Report - Campus SuperApp.pdf', 48, 2, 'color', 'single', 'hardbound', 'Girls Hostel GH-1, Room 102', '9812345678', 'regular', 280.0, 'paid', 'printing', 'Tomorrow, 9:00 AM')
+      `).run(DEMO_USER_ID);
+    }
+
+
+    // Seed Teacher Classes & Assignments
+    const existingClass = db.prepare('SELECT id FROM teacher_classes LIMIT 1').get();
+    if (!existingClass) {
+      console.log('Seeding Teacher Classes & Weak Topics...');
+      const classId = 'class_cse_401';
+      db.prepare(`
+        INSERT INTO teacher_classes (id, teacher_id, name, subject, branch, semester, code, student_count)
+        VALUES (?, ?, 'B.Tech CSE - 4th Sem (Batch A & B)', 'Operating Systems', 'Computer Science', 'Sem 4', 'CS-401-OS', 64)
+      `).run(classId, DEMO_USER_ID);
+
+      const questions = JSON.stringify([
+        { question: 'Explain Dining Philosophers problem and how to prevent circular wait using asymmetric solution.', type: 'subjective', marks: 5 },
+        { question: 'Which scheduling algorithm can cause starvation? (A) FCFS (B) Round Robin (C) Shortest Job First (D) FIFO', type: 'mcq', marks: 2 },
+        { question: 'Calculate Effective Access Time (EAT) given TLB hit ratio 90%, TLB access time 10ns, Memory access time 100ns.', type: 'subjective', marks: 8 }
+      ]);
+
+      db.prepare(`
+        INSERT INTO teacher_assignments (id, class_id, teacher_id, title, topic, due_date, total_marks, questions, submissions_count)
+        VALUES ('asg_1', ?, ?, 'Unit 2: Process Synchronization & Deadlocks Assignment', 'Process Synchronization', '2026-10-30', 15, ?, 48)
+      `).run(classId, DEMO_USER_ID, questions);
+    }
+  } catch (err) {
+    console.error('Startup seeding failed:', err);
+  }
+}
+

@@ -32,14 +32,31 @@ export class MultiAIProvider {
     this.groqSttModel = API_CONFIG.AI_MODELS.GROQ_STT;
     this.geminiModel = API_CONFIG.AI_MODELS.GEMINI_PRIMARY;
     this.geminiEmbeddingModel = API_CONFIG.AI_MODELS.GEMINI_EMBEDDING;
+    this.getGeminiClient();
+  }
 
-    if (this.geminiKey && this.geminiKey !== 'MY_GEMINI_API_KEY') {
+  public getGeminiClient(): GoogleGenAI | null {
+    const key = process.env.GEMINI_API_KEY || this.geminiKey;
+    if (!key || key === 'MY_GEMINI_API_KEY') {
+      return null;
+    }
+    if (!this.geminiClient || this.geminiKey !== key) {
+      this.geminiKey = key;
       try {
-        this.geminiClient = new GoogleGenAI({ apiKey: this.geminiKey });
+        this.geminiClient = new GoogleGenAI({
+          apiKey: key,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            }
+          }
+        });
       } catch (err) {
         console.error('Failed to initialize Gemini client:', err);
+        this.geminiClient = null;
       }
     }
+    return this.geminiClient;
   }
 
   public classifyError(err: any): { errorKind: 'NO_KEY' | 'QUOTA_EXCEEDED' | 'MODEL_NOT_FOUND' | 'TIMEOUT' | 'UNKNOWN', message: string, fixHint: string } {
@@ -90,9 +107,10 @@ export class MultiAIProvider {
     };
 
     // Test Gemini
-    if (this.geminiClient) {
+    const gemini = this.getGeminiClient();
+    if (gemini) {
       try {
-        const response = await this.geminiClient.models.generateContent({
+        const response = await gemini.models.generateContent({
           model: this.geminiModel,
           contents: 'Say OK',
         });
@@ -159,14 +177,15 @@ export class MultiAIProvider {
     }
 
     // Attempt 2: Gemini
-    if (this.geminiClient) {
+    const gemini = this.getGeminiClient();
+    if (gemini) {
       try {
         const fullPrompt = [
           systemInstruction ? `[SYSTEM INSTRUCTION]\n${systemInstruction}\n` : '',
           ...messages.map(m => `${m.role.toUpperCase()}: ${m.content}`)
         ].join('\n\n');
 
-        const response = await this.geminiClient.models.generateContent({
+        const response = await gemini.models.generateContent({
           model: this.geminiModel,
           contents: fullPrompt
         });
@@ -255,7 +274,8 @@ export class MultiAIProvider {
     mimeType: string,
     prompt: string
   ): Promise<AIProviderResult<string>> {
-    if (!this.geminiClient) {
+    const gemini = this.getGeminiClient();
+    if (!gemini) {
       return {
         success: false,
         provider: 'gemini',
@@ -267,7 +287,7 @@ export class MultiAIProvider {
     }
 
     try {
-      const response = await this.geminiClient.models.generateContent({
+      const response = await gemini.models.generateContent({
         model: this.geminiModel,
         contents: [
           {
@@ -354,24 +374,45 @@ export class MultiAIProvider {
 
   // Embed text
   public async embed(text: string): Promise<AIProviderResult<number[]>> {
-    if (this.geminiClient) {
-      try {
-        const res: any = await this.geminiClient.models.embedContent({
-          model: this.geminiEmbeddingModel,
-          contents: text
-        });
-        const values = res.embedding?.values || res.embeddings?.[0]?.values;
-        if (values) {
-          return {
-            success: true,
-            data: values,
-            provider: 'gemini',
-            modelUsed: this.geminiEmbeddingModel
-          };
+    const cleanText = (text || '').trim();
+    if (!cleanText) {
+      return {
+        success: false,
+        provider: 'fallback_keyword',
+        modelUsed: 'keyword-frequency',
+        error: 'Empty text provided for embedding.'
+      };
+    }
+
+    const gemini = this.getGeminiClient();
+    if (gemini) {
+      const candidateModels = Array.from(new Set([
+        this.geminiEmbeddingModel,
+        'gemini-embedding-2-preview',
+        'gemini-embedding-001'
+      ])).filter(Boolean);
+
+      for (const model of candidateModels) {
+        try {
+          const res: any = await gemini.models.embedContent({
+            model,
+            contents: cleanText
+          });
+          const values = res.embedding?.values || res.embeddings?.[0]?.values;
+          if (Array.isArray(values) && values.length > 0) {
+            return {
+              success: true,
+              data: values,
+              provider: 'gemini',
+              modelUsed: model
+            };
+          }
+        } catch (err: any) {
+          // Log informative debug message and continue cascade
+          console.warn(`Gemini embedding with model ${model} failed (${err?.message || err}), trying fallback`);
         }
-      } catch (err) {
-        console.warn('Gemini embedding failed, using keyword fallback');
       }
+      console.warn('Gemini embedding failed, using keyword fallback');
     }
 
     return {

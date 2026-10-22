@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
 import { useTheme } from '../context/ThemeContext.js';
-import { Flame, Zap, Moon, Sun, User as UserIcon, LogOut, ChevronDown, Check } from 'lucide-react';
+import { Flame, Zap, Moon, Sun, User as UserIcon, LogOut, ChevronDown, Check, Coins, GraduationCap, ShieldCheck } from 'lucide-react';
 import { Language } from '../types.js';
+import { apiClient } from '../services/api-client.js';
 
 interface NavbarProps {
   onOpenAuth: () => void;
@@ -17,6 +18,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, activeTab, setActive
   const { theme, toggleTheme } = useTheme();
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [currentRole, setCurrentRole] = useState<'student' | 'teacher'>('student');
+
+  const handleRoleToggle = async () => {
+    const nextRole = currentRole === 'student' ? 'teacher' : 'student';
+    try {
+      await apiClient.switchRole(nextRole);
+      setCurrentRole(nextRole);
+      setActiveTab(nextRole === 'teacher' ? 'teacher_dashboard' : 'dashboard');
+    } catch {
+      setCurrentRole(nextRole);
+      setActiveTab(nextRole === 'teacher' ? 'teacher_dashboard' : 'dashboard');
+    }
+  };
 
   const langLabels: Record<Language, string> = {
     en: 'EN',
@@ -45,21 +59,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, activeTab, setActive
       </div>
 
       {/* Zone 2: Navigation Links (desktop quick jump) */}
-      <nav className="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
+      <nav className="hidden xl:flex items-center gap-5 text-xs font-semibold text-slate-600 dark:text-slate-300">
         {[
-          { id: 'dashboard', label: 'Dashboard' },
+          { id: 'dashboard', label: 'Home' },
           { id: 'chat', label: 'Study Chat' },
+          { id: 'notes_library', label: 'Notes Library ⭐' },
+          { id: 'printing', label: 'Print Hub 🖨️' },
+          { id: 'english', label: 'English Coach 🗣️' },
           { id: 'quiz', label: 'Quiz' },
           { id: 'viva', label: 'Voice Viva' },
-          { id: 'planner', label: 'Exam Planner' },
-          { id: 'scanner', label: 'Notes Scanner' },
+          { id: 'teacher_dashboard', label: 'Faculty' },
         ].map(item => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
             className={`whitespace-nowrap transition-colors hover:text-slate-950 dark:hover:text-white cursor-pointer ${
               activeTab === item.id
-                ? 'font-semibold text-indigo-600 dark:text-indigo-400'
+                ? 'font-bold text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400 pb-0.5'
                 : ''
             }`}
           >
@@ -68,14 +84,46 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, activeTab, setActive
         ))}
       </nav>
 
-      {/* Zone 3: Gamification Chips + Language Switcher + Theme + Profile Menu */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+      {/* Zone 3: Gamification Chips + Role Switcher + Language + Theme */}
+      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        {/* Role Switcher Pill */}
+        <button
+          onClick={handleRoleToggle}
+          title="Click to toggle between Student & Faculty Portal"
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer shadow-xs ${
+            currentRole === 'teacher'
+              ? 'bg-indigo-900 text-indigo-200 border-indigo-700 ring-2 ring-indigo-500/30'
+              : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
+          }`}
+        >
+          {currentRole === 'teacher' ? (
+            <>
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
+              <span>Faculty Mode</span>
+            </>
+          ) : (
+            <>
+              <GraduationCap className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Student Mode</span>
+            </>
+          )}
+        </button>
+
+        {/* Campus Coins */}
+        <div
+          title="Campus Coins (Earned by sharing notes)"
+          className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 text-amber-700 dark:text-amber-300 text-xs font-semibold tabular-nums cursor-default shadow-xs"
+        >
+          <Coins className="w-3.5 h-3.5 text-amber-500" />
+          <span>150 ⭐</span>
+        </div>
+
         {/* Streak Flame */}
         <div
           title="Daily Study Streak"
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 text-amber-700 dark:text-amber-300 text-xs font-semibold tabular-nums cursor-default shadow-xs"
         >
-          <Flame className="w-4 h-4 fill-amber-500 text-amber-500 animate-pulse" />
+          <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500 animate-pulse" />
           <span>{profile?.streak_days || 3}d</span>
         </div>
 
@@ -97,6 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, activeTab, setActive
             <span>{langLabels[language]}</span>
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </button>
+
 
           {langMenuOpen && (
             <div className="absolute right-0 mt-1.5 w-32 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-1 text-xs z-50 animate-in fade-in zoom-in-95">

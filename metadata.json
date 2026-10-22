@@ -1,8 +1,9 @@
 {
-  "name": "CampusSathi AI - All-in-One AI Study Platform",
-  "description": "Upload notes, chat with PDFs, quiz yourself, practice spoken viva, scan handwritten notes into flashcards, and plan exams in English, Hindi & Hinglish.",
+  "name": "CampusSathi AI - College SuperApp & Study Platform",
+  "description": "All-in-one AI campus platform: Notes Library & Marketplace, Campus Print Delivery, English AI Coach, Dual Student & Faculty Portals, Voice Viva & MCQ Quizzes.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
+
 
 

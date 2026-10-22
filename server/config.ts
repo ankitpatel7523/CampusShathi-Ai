@@ -13,7 +13,7 @@ export const API_CONFIG = {
   // 3. AI Model Configurations
   AI_MODELS: {
     GEMINI_PRIMARY: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
-    GEMINI_EMBEDDING: process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001',
+    GEMINI_EMBEDDING: process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2-preview',
     GROQ_PRIMARY: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
     GROQ_STT: process.env.GROQ_STT_MODEL || 'whisper-large-v3-turbo',
   },
