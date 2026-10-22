@@ -5,8 +5,11 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  role?: 'student' | 'teacher';
   college?: string;
   course?: string;
+  department?: string;
+  employee_id?: string;
   year?: string;
   semester?: string;
 }
@@ -23,6 +26,9 @@ export interface Profile {
   streak_days: number;
   longest_streak: number;
   stars?: number;
+  campus_coins?: number;
+  uploads_count?: number;
+  hype_score?: number;
 }
 
 export interface DocumentItem {

@@ -1,6 +1,8 @@
+import React from 'react';
 import { 
   LayoutDashboard, MessageSquareText, HelpCircle, Mic, Calendar, 
-  ScanText, User, ChevronLeft, ChevronRight, BookOpen, Printer, Sparkles, GraduationCap 
+  ScanText, ChevronLeft, ChevronRight, BookOpen, Printer, Sparkles, 
+  GraduationCap, Users, ShieldCheck, AlertTriangle, FileCheck, ArrowLeft, LogOut
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext.js';
 
@@ -9,17 +11,22 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   collapsed: boolean;
   setCollapsed: (c: boolean) => void;
+  currentRole?: 'student' | 'teacher';
+  onSwitchToStudent?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   collapsed,
-  setCollapsed
+  setCollapsed,
+  currentRole = 'student',
+  onSwitchToStudent
 }) => {
   const { t } = useLanguage();
 
-  const navItems = [
+  // Pure student navigation items (No Teacher tab, No Profile tab)
+  const studentNavItems = [
     {
       id: 'dashboard',
       label: t('navDashboard') || 'Dashboard',
@@ -84,15 +91,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'Audio'
     },
     {
-      id: 'teacher_dashboard',
-      label: 'Teacher Portal',
-      icon: GraduationCap,
-      color: 'from-slate-700 to-indigo-800',
-      activeText: 'text-indigo-700 dark:text-indigo-300',
-      activeBg: 'bg-indigo-50/80 dark:bg-indigo-950/80 border-indigo-300 dark:border-indigo-700',
-      badge: 'Faculty'
-    },
-    {
       id: 'planner',
       label: t('navPlanner') || 'Exam Planner',
       icon: Calendar,
@@ -109,18 +107,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
       activeText: 'text-fuchsia-600 dark:text-purple-400',
       activeBg: 'bg-fuchsia-50 dark:bg-fuchsia-950/60 border-fuchsia-200 dark:border-fuchsia-800/60',
       badge: 'OCR'
-    },
-    {
-      id: 'profile',
-      label: t('navProfile') || 'Profile',
-      icon: User,
-      color: 'from-slate-600 to-slate-800',
-      activeText: 'text-slate-800 dark:text-slate-200',
-      activeBg: 'bg-slate-100 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700',
-      badge: 'You'
     }
   ];
 
+  // Dedicated Faculty / Teacher Portal navigation items
+  const teacherNavItems = [
+    {
+      id: 'teacher_dashboard',
+      label: 'Batches & Roster',
+      icon: Users,
+      color: 'from-indigo-700 to-slate-900',
+      activeText: 'text-indigo-700 dark:text-indigo-300',
+      activeBg: 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-300 dark:border-indigo-700',
+      badge: 'Classes'
+    },
+    {
+      id: 'teacher_assignments',
+      label: 'AI Tests & Grading',
+      icon: BookOpen,
+      color: 'from-violet-600 to-indigo-700',
+      activeText: 'text-violet-600 dark:text-violet-300',
+      activeBg: 'bg-violet-50 dark:bg-violet-950/80 border-violet-300 dark:border-violet-700',
+      badge: 'Exam AI'
+    },
+    {
+      id: 'teacher_radar',
+      label: 'Struggle Radar',
+      icon: AlertTriangle,
+      color: 'from-amber-600 to-rose-600',
+      activeText: 'text-amber-600 dark:text-amber-300',
+      activeBg: 'bg-amber-50 dark:bg-amber-950/80 border-amber-300 dark:border-amber-700',
+      badge: 'Radar'
+    },
+    {
+      id: 'teacher_verify',
+      label: 'Notes Certification',
+      icon: ShieldCheck,
+      color: 'from-amber-500 to-yellow-600',
+      activeText: 'text-amber-700 dark:text-amber-300',
+      activeBg: 'bg-amber-50 dark:bg-amber-950/80 border-amber-300 dark:border-amber-700',
+      badge: 'Gold ⭐'
+    },
+    {
+      id: 'teacher_doubts',
+      label: 'Doubt Resolution Desk',
+      icon: MessageSquareText,
+      color: 'from-blue-600 to-teal-600',
+      activeText: 'text-blue-600 dark:text-cyan-300',
+      activeBg: 'bg-blue-50 dark:bg-blue-950/80 border-blue-300 dark:border-blue-700',
+      badge: 'Inbox'
+    },
+    {
+      id: 'teacher_broadcasts',
+      label: 'Class Notices',
+      icon: Calendar,
+      color: 'from-emerald-600 to-teal-700',
+      activeText: 'text-emerald-600 dark:text-emerald-300',
+      activeBg: 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-300 dark:border-emerald-700',
+      badge: 'Notice'
+    }
+  ];
+
+  const isTeacherMode = currentRole === 'teacher' || activeTab.startsWith('teacher');
+  const navItems = isTeacherMode ? teacherNavItems : studentNavItems;
 
   return (
     <>
@@ -130,10 +179,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           collapsed ? 'w-20' : 'w-64'
         }`}
       >
-        <div className="flex flex-col flex-1 p-3 space-y-1.5">
+        {/* Faculty Mode Indicator Banner */}
+        {isTeacherMode && !collapsed && (
+          <div className="mx-3 mt-3 p-2.5 rounded-xl bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white border border-indigo-700/60 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-indigo-300 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                Faculty Portal
+              </span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
+            <p className="text-xs font-bold mt-0.5 truncate">
+              Educator Console
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-col flex-1 p-3 space-y-1.5 overflow-y-auto">
           {navItems.map(item => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeTab === item.id || (item.id === 'teacher_dashboard' && activeTab === 'teacher_dashboard');
             return (
               <button
                 key={item.id}
@@ -174,6 +239,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </div>
 
+        {/* Exit Teacher Mode Button (when in teacher mode) */}
+        {isTeacherMode && onSwitchToStudent && (
+          <div className="p-3 border-t border-slate-100 dark:border-slate-800/60">
+            <button
+              onClick={onSwitchToStudent}
+              title="Return to Student Portal"
+              className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition cursor-pointer shadow-xs"
+            >
+              <ArrowLeft className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              {!collapsed && <span>Return to Student Mode</span>}
+            </button>
+          </div>
+        )}
+
         {/* Sidebar Collapse Toggle Button */}
         <div className="p-3 border-t border-slate-100 dark:border-slate-800/60">
           <button
@@ -210,20 +289,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           );
         })}
-        {/* Mobile More Button for scanner & profile */}
-        <button
-          onClick={() => setActiveTab(activeTab === 'scanner' ? 'profile' : 'scanner')}
-          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
-            activeTab === 'scanner' || activeTab === 'profile'
-              ? 'text-fuchsia-600 dark:text-purple-400'
-              : 'text-slate-400'
-          }`}
-        >
-          <div className="p-1 rounded-md">
-            <ScanText className="w-4 h-4" />
-          </div>
-          <span className="text-[10px] font-medium leading-tight">OCR/Me</span>
-        </button>
+        {/* If in Teacher mode on mobile, allow quick return */}
+        {isTeacherMode && onSwitchToStudent && (
+          <button
+            onClick={onSwitchToStudent}
+            className="flex flex-col items-center gap-1 py-1 px-2.5 rounded-lg text-indigo-600 dark:text-indigo-400 cursor-pointer"
+          >
+            <div className="p-1 rounded-md bg-indigo-50 dark:bg-indigo-950">
+              <ArrowLeft className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-bold leading-tight">Student</span>
+          </button>
+        )}
       </nav>
     </>
   );

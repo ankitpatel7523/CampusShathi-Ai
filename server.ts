@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { db, initDb } from './server/db.js';
 import { aiProvider } from './server/providers.js';
 import { RAGService, OUT_OF_SCOPE_RESPONSES } from './server/rag.js';
-import { seedDemoData, seedStartupModules, DEMO_USER_ID, DEMO_EMAIL } from './server/seed.js';
+import { seedDemoData, seedStartupModules, DEMO_USER_ID, DEMO_EMAIL, DEMO_TEACHER_ID, DEMO_TEACHER_EMAIL } from './server/seed.js';
 import { backendRouter } from './backend/src/app.js';
 
 dotenv.config();
@@ -44,8 +44,9 @@ app.use('/api', backendRouter);
 
 // Simple in-memory token map for session auth (httpOnly cookie or Bearer header)
 const tokenUserMap = new Map<string, string>();
-// Pre-seed demo token
+// Pre-seed demo tokens
 tokenUserMap.set('demo_session_token_123', DEMO_USER_ID);
+tokenUserMap.set('demo_teacher_session_token_123', DEMO_TEACHER_ID);
 
 // Auth middleware: extracts user_id
 function requireAuth(req: Request, res: Response, next: NextFunction): void {
@@ -103,6 +104,7 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
     name: z.string().min(2),
     email: z.string().email(),
     password: z.string().min(6),
+    role: z.enum(['student', 'teacher']).optional().default('student'),
     college: z.string().optional().default(''),
     course: z.string().optional().default(''),
     year: z.string().optional().default('1st Year'),
@@ -114,7 +116,7 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Validation failed', errorKind: 'VALIDATION_ERROR', details: parsed.error.issues });
   }
 
-  const { name, email, password, college, course, year, semester } = parsed.data;
+  const { name, email, password, role, college, course, year, semester } = parsed.data;
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (existing) {
     return res.status(400).json({ error: 'Email already registered', errorKind: 'DUPLICATE_EMAIL' });
@@ -124,35 +126,42 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
   const hash = crypto.createHash('sha256').update(password).digest('hex');
 
   db.prepare(`
-    INSERT INTO users (id, email, password_hash, name, college, course, year, semester)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(userId, email, hash, name, college, course, year, semester);
+    INSERT INTO users (id, email, password_hash, name, role, college, course, year, semester)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(userId, email, hash, name, role, college, course, year, semester);
 
+  const defaultAvatar = role === 'teacher' ? '👨‍🏫' : '🎓';
   db.prepare(`
     INSERT INTO profiles (user_id, avatar, accent_color, theme, default_language, daily_goal_minutes, xp, level, streak_days, longest_streak)
-    VALUES (?, '🎓', 'indigo', 'light', 'en', 45, 50, 1, 1, 1)
-  `).run(userId);
+    VALUES (?, ?, 'indigo', 'light', 'en', 45, 50, 1, 1, 1)
+  `).run(userId, defaultAvatar);
 
   const token = `token_${crypto.randomBytes(24).toString('hex')}`;
   tokenUserMap.set(token, userId);
 
-  awardUserXp(userId, 50, 'signup', 'Joined CampusSathi AI');
+  awardUserXp(userId, 50, 'signup', role === 'teacher' ? 'Joined Faculty Portal' : 'Joined CampusSathi AI');
 
   res.cookie('campussathi_token', token, { httpOnly: true, maxAge: 30 * 24 * 3600 * 1000 });
-  res.json({ token, user: { id: userId, email, name, college, course, year, semester } });
+  res.json({ token, user: { id: userId, email, name, role, college, course, year, semester } });
 });
 
 app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password, role: requestedRole } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required', errorKind: 'MISSING_FIELDS' });
   }
 
   const hash = crypto.createHash('sha256').update(password).digest('hex');
-  const user = db.prepare('SELECT * FROM users WHERE email = ? AND password_hash = ?').get(email, hash) as any;
+  const user = db.prepare("SELECT id, email, name, COALESCE(role, 'student') as role, college, course, year, semester, created_at FROM users WHERE email = ? AND password_hash = ?").get(email, hash) as any;
 
   if (!user) {
     return res.status(401).json({ error: 'Invalid email or password', errorKind: 'AUTH_FAILED' });
+  }
+
+  // If user selected a specific role in login tab, update and sync their role
+  if (requestedRole && (requestedRole === 'student' || requestedRole === 'teacher') && user.role !== requestedRole) {
+    db.prepare('UPDATE users SET role = ? WHERE id = ?').run(requestedRole, user.id);
+    user.role = requestedRole;
   }
 
   const token = `token_${crypto.randomBytes(24).toString('hex')}`;
@@ -162,10 +171,16 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   res.json({ token, user });
 });
 
-app.post('/api/auth/demo', (_req: Request, res: Response) => {
-  const token = 'demo_session_token_123';
-  tokenUserMap.set(token, DEMO_USER_ID);
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(DEMO_USER_ID);
+app.post('/api/auth/demo', (req: Request, res: Response) => {
+  const targetRole = req.body?.role || req.query?.role;
+  const isTeacher = targetRole === 'teacher';
+
+  const token = isTeacher ? 'demo_teacher_session_token_123' : 'demo_session_token_123';
+  const targetUserId = isTeacher ? DEMO_TEACHER_ID : DEMO_USER_ID;
+
+  tokenUserMap.set(token, targetUserId);
+  const user = db.prepare("SELECT id, email, name, COALESCE(role, 'student') as role, college, course, year, semester, created_at FROM users WHERE id = ?").get(targetUserId);
+
   res.cookie('campussathi_token', token, { httpOnly: true, maxAge: 30 * 24 * 3600 * 1000 });
   res.json({ token, user });
 });
@@ -374,6 +389,9 @@ app.get('/api/dashboard', requireAuth, (req: Request, res: Response) => {
       streakDays: profile.streak_days || 3,
       xp: profile.xp || 120,
       level: profile.level || 1,
+      campusCoins: profile.campus_coins ?? 150,
+      uploadsCount: profile.uploads_count || 0,
+      hypeScore: profile.hype_score || ((profile.xp || 120) + ((profile.campus_coins || 150) * 2)),
       totalQuizzes: quizStats.total_quizzes || 0,
       avgQuizScore: Math.round(quizStats.avg_score || 0),
       flashcardsDueToday: dueFlashcards.due_count || 0,
@@ -502,7 +520,17 @@ app.post('/api/documents', requireAuth, upload.single('file'), async (req: Reque
     `).run(`chunk_${fileId}_${idx}`, userId, fileId, chunk.page, idx, chunk.content, vectorJson);
   }
 
-  awardUserXp(userId, 30, 'upload', `Uploaded ${title}`);
+  awardUserXp(userId, 50, 'upload', `Uploaded ${title}`);
+  try {
+    db.prepare(`
+      UPDATE profiles 
+      SET campus_coins = COALESCE(campus_coins, 150) + 50, 
+          uploads_count = COALESCE(uploads_count, 0) + 1, 
+          streak_days = streak_days + 1,
+          hype_score = COALESCE(hype_score, 100) + 100 
+      WHERE user_id = ?
+    `).run(userId);
+  } catch {}
 
   res.json({
     success: true,
@@ -1361,6 +1389,16 @@ Output JSON:
   }
 
   awardUserXp(userId, 50, 'scan', 'Scanned handwritten notes & created flashcards');
+  try {
+    db.prepare(`
+      UPDATE profiles 
+      SET campus_coins = COALESCE(campus_coins, 150) + 40, 
+          uploads_count = COALESCE(uploads_count, 0) + 1, 
+          streak_days = streak_days + 1,
+          hype_score = COALESCE(hype_score, 100) + 100 
+      WHERE user_id = ?
+    `).run(userId);
+  } catch {}
 
   res.json({
     scanId,

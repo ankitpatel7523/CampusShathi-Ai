@@ -23,6 +23,7 @@ export function initDb() {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       name TEXT NOT NULL,
+      role TEXT DEFAULT 'student',
       college TEXT DEFAULT '',
       course TEXT DEFAULT '',
       year TEXT DEFAULT '1st Year',
@@ -342,6 +343,18 @@ export function initDb() {
 
   try {
     db.exec(`ALTER TABLE profiles ADD COLUMN campus_coins INTEGER DEFAULT 150;`);
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE profiles ADD COLUMN uploads_count INTEGER DEFAULT 0;`);
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE profiles ADD COLUMN hype_score INTEGER DEFAULT 100;`);
   } catch {
     // Column already exists
   }

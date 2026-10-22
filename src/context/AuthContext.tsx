@@ -6,9 +6,9 @@ interface AuthContextType {
   profile: Profile | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (data: any) => Promise<{ success: boolean; error?: string }>;
-  loginAsDemo: () => Promise<void>;
+  login: (email: string, pass: string, role?: 'student' | 'teacher') => Promise<{ success: boolean; error?: string; user?: User }>;
+  signup: (data: any) => Promise<{ success: boolean; error?: string; user?: User }>;
+  loginAsDemo: (role?: 'student' | 'teacher') => Promise<void>;
   logout: () => Promise<void>;
   updateProfileLocally: (userPartial?: Partial<User>, profilePartial?: Partial<Profile>) => void;
   refreshUserData: () => Promise<void>;
@@ -34,13 +34,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = await res.json();
         setUser(data.user);
         setProfile(data.profile);
+        if (data.user?.role) {
+          localStorage.setItem('campussathi_role', data.user.role);
+        }
       } else {
         // Fallback to demo login if first time
-        await loginAsDemo();
+        const currentSavedRole = (localStorage.getItem('campussathi_role') as 'student' | 'teacher') || 'student';
+        await loginAsDemo(currentSavedRole);
       }
     } catch (err) {
       console.warn('Failed to load user, trying demo login:', err);
-      await loginAsDemo();
+      const currentSavedRole = (localStorage.getItem('campussathi_role') as 'student' | 'teacher') || 'student';
+      await loginAsDemo(currentSavedRole);
     } finally {
       setLoading(false);
     }
@@ -50,20 +55,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchCurrentUser();
   }, []);
 
-  const login = async (email: string, pass: string) => {
+  const login = async (email: string, pass: string, role?: 'student' | 'teacher') => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pass })
+        body: JSON.stringify({ email, password: pass, role })
       });
       const data = await res.json();
       if (res.ok && data.token) {
         setToken(data.token);
         localStorage.setItem('campussathi_token', data.token);
         setUser(data.user);
+        if (data.user?.role) {
+          localStorage.setItem('campussathi_role', data.user.role);
+        }
         await fetchCurrentUser(data.token);
-        return { success: true };
+        return { success: true, user: data.user };
       }
       return { success: false, error: data.error || 'Login failed' };
     } catch (err: any) {
@@ -83,8 +91,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(data.token);
         localStorage.setItem('campussathi_token', data.token);
         setUser(data.user);
+        if (data.user?.role) {
+          localStorage.setItem('campussathi_role', data.user.role);
+        }
         await fetchCurrentUser(data.token);
-        return { success: true };
+        return { success: true, user: data.user };
       }
       return { success: false, error: data.error || 'Signup failed' };
     } catch (err: any) {
@@ -92,14 +103,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginAsDemo = async () => {
+  const loginAsDemo = async (targetRole: 'student' | 'teacher' = 'student') => {
     try {
-      const res = await fetch('/api/auth/demo', { method: 'POST' });
+      const res = await fetch('/api/auth/demo', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: targetRole })
+      });
       const data = await res.json();
       if (data.token) {
         setToken(data.token);
         localStorage.setItem('campussathi_token', data.token);
         setUser(data.user);
+        const resolvedRole = data.user?.role || targetRole;
+        localStorage.setItem('campussathi_role', resolvedRole);
+        if (resolvedRole === 'teacher') {
+          localStorage.setItem('campussathi_faculty_name', data.user?.name || 'Dr. Rajesh Sharma');
+          localStorage.setItem('campussathi_faculty_dept', 'Computer Science & Engineering');
+        }
         const meRes = await fetch('/api/me', { headers: { Authorization: `Bearer ${data.token}` } });
         if (meRes.ok) {
           const meData = await meRes.json();

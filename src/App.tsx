@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AuthProvider } from './context/AuthContext.js';
+import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { LanguageProvider } from './context/LanguageContext.js';
 import { ThemeProvider } from './context/ThemeContext.js';
 import { Navbar } from './components/Navbar.js';
@@ -19,11 +19,43 @@ import { EnglishTeacherPage } from './features/english-teacher/EnglishTeacherPag
 import { TeacherDashboard } from './features/teacher/TeacherDashboard.js';
 
 function MainLayout() {
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const savedRole = localStorage.getItem('campussathi_role');
+    return savedRole === 'teacher' ? 'teacher_dashboard' : 'dashboard';
+  });
+  const [currentRole, setCurrentRole] = useState<'student' | 'teacher'>(() => {
+    return (localStorage.getItem('campussathi_role') as 'student' | 'teacher') || 'student';
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
   const [quizInitialDocId, setQuizInitialDocId] = useState<string | undefined>(undefined);
   const [preselectedPrintDoc, setPreselectedPrintDoc] = useState<{ documentTitle: string; pages: number } | null>(null);
+
+  const handleSwitchToStudent = () => {
+    localStorage.setItem('campussathi_role', 'student');
+    setCurrentRole('student');
+    setActiveTab('dashboard');
+  };
+
+  const handleRoleChange = (role: 'student' | 'teacher') => {
+    localStorage.setItem('campussathi_role', role);
+    setCurrentRole(role);
+    if (role === 'teacher') {
+      setActiveTab('teacher_dashboard');
+    } else {
+      setActiveTab('dashboard');
+    }
+  };
+
+  // Automatically sync role when user profile changes
+  useEffect(() => {
+    if (user?.role && (user.role === 'student' || user.role === 'teacher')) {
+      if (user.role !== currentRole) {
+        handleRoleChange(user.role);
+      }
+    }
+  }, [user?.role]);
 
   const handleStartQuizWithDoc = (docId: string) => {
     setQuizInitialDocId(docId);
@@ -37,6 +69,8 @@ function MainLayout() {
         onOpenAuth={() => setAuthModalOpen(true)}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        currentRole={currentRole}
+        setCurrentRole={handleRoleChange}
       />
 
       <div className="flex flex-1 relative overflow-hidden">
@@ -46,6 +80,8 @@ function MainLayout() {
           setActiveTab={setActiveTab}
           collapsed={sidebarCollapsed}
           setCollapsed={setSidebarCollapsed}
+          currentRole={currentRole}
+          onSwitchToStudent={handleSwitchToStudent}
         />
 
         {/* Main Content Viewport */}
@@ -89,8 +125,12 @@ function MainLayout() {
                 <EnglishTeacherPage />
               )}
 
-              {activeTab === 'teacher_dashboard' && (
-                <TeacherDashboard />
+              {(activeTab === 'teacher_dashboard' || activeTab.startsWith('teacher')) && (
+                <TeacherDashboard
+                  activeSubTab={activeTab}
+                  onSelectSubTab={setActiveTab}
+                  onSwitchToStudent={handleSwitchToStudent}
+                />
               )}
 
               {activeTab === 'chat' && (
@@ -129,10 +169,12 @@ function MainLayout() {
       </div>
 
 
-      {/* Auth Modal for Sign Up / Log In / Demo Student */}
+      {/* Auth Modal with explicit Role Choice (Student vs Teacher) */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
+        initialRole={currentRole}
+        onRoleSuccess={handleRoleChange}
       />
     </div>
   );

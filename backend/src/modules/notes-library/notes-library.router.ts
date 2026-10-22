@@ -273,13 +273,35 @@ notesLibraryRouter.post('/upload', authenticate, noteUpload.single('file'), asyn
       1
     );
 
-    // Award XP and coins to creator for sharing real notes
-    db.prepare(`UPDATE profiles SET xp = xp + 150, campus_coins = campus_coins + 50 WHERE user_id = ?`).run(userId);
+    // Award XP, coins, streak, hype and uploads count to creator for sharing notes
+    db.prepare(`
+      UPDATE profiles 
+      SET xp = xp + 150, 
+          campus_coins = COALESCE(campus_coins, 150) + 100, 
+          uploads_count = COALESCE(uploads_count, 0) + 1,
+          streak_days = streak_days + 1,
+          hype_score = COALESCE(hype_score, 100) + 200
+      WHERE user_id = ?
+    `).run(userId);
+
+    // Also record in activity log
+    try {
+      db.prepare(`
+        INSERT INTO activity_log (id, user_id, activity_type, title, xp_earned)
+        VALUES (?, ?, 'upload', ?, 150)
+      `).run(`act_${Date.now()}`, userId, `Shared Notes: ${validated.title}`);
+    } catch {}
 
     const newNote = db.prepare('SELECT * FROM notes_library WHERE id = ?').get(noteId);
+    const updatedProfile = db.prepare('SELECT * FROM profiles WHERE user_id = ?').get(userId);
+
     res.status(201).json({
       note: newNote,
-      message: 'Notes uploaded successfully! You earned +150 XP and +50 Campus Coins ⭐'
+      profile: updatedProfile,
+      hypeEarned: 200,
+      coinsEarned: 100,
+      xpEarned: 150,
+      message: '🔥 Notes shared! +100 Campus Coins, +150 XP, & +200 Hype earned!'
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Validation error' });

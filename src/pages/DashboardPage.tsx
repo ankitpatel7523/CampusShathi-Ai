@@ -273,10 +273,10 @@ export const DashboardPage: React.FC<DashboardProps> = ({ setActiveTab }) => {
           </div>
         </div>
 
-        {/* Card 5: Campus Stars & Flashcards (Rose / Fuchsia) */}
+        {/* Card 5: Campus Coins, Uploads & Hype */}
         <div className="p-4 rounded-2xl bg-gradient-to-br from-pink-500/12 via-fuchsia-500/5 to-white dark:to-slate-900 border border-pink-500/35 hover:border-pink-500/65 shadow-sm hover:shadow-md hover:shadow-pink-500/10 transition-all flex flex-col justify-between group col-span-1 sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-pink-900 dark:text-pink-300">Campus Rewards</span>
+            <span className="text-xs font-semibold text-pink-900 dark:text-pink-300">Coins & Hype ⭐</span>
             <div className="p-2 rounded-xl bg-pink-500/15 text-pink-600 dark:text-pink-400 ring-1 ring-pink-500/30 group-hover:scale-110 transition-transform">
               <Star className="w-4 h-4 fill-pink-500 text-pink-500" />
             </div>
@@ -284,20 +284,20 @@ export const DashboardPage: React.FC<DashboardProps> = ({ setActiveTab }) => {
           <div className="mt-3">
             <div className="flex items-baseline gap-1.5">
               <span className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
-                {profile?.stars || 350}
+                {profile?.campus_coins ?? data?.stats?.campusCoins ?? 150}
               </span>
-              <span className="text-xs font-semibold text-pink-600 dark:text-pink-400">⭐ Stars</span>
+              <span className="text-xs font-semibold text-pink-600 dark:text-pink-400">Coins ⭐</span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mt-2">
-              <div className="h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-400 w-2/3" />
+              <div className="h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-400 w-3/4" />
             </div>
             <div className="text-[11px] text-pink-700 dark:text-pink-300 font-medium mt-1.5 flex items-center justify-between">
-              <span>{data?.stats?.flashcardsDueToday || 3} cards due</span>
+              <span>{profile?.uploads_count ?? data?.stats?.uploadsCount ?? 0} PDFs Shared</span>
               <button
-                onClick={() => setActiveTab('scanner')}
+                onClick={() => setActiveTab('notes_library')}
                 className="font-bold text-fuchsia-600 dark:text-fuchsia-400 hover:underline cursor-pointer"
               >
-                Review →
+                +Share & Earn →
               </button>
             </div>
           </div>

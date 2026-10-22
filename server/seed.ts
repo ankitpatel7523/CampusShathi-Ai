@@ -3,20 +3,44 @@ import crypto from 'node:crypto';
 
 export const DEMO_USER_ID = 'user_demo_ankit';
 export const DEMO_EMAIL = 'ankit@campussathi.ai';
+export const DEMO_TEACHER_ID = 'user_demo_teacher';
+export const DEMO_TEACHER_EMAIL = 'rajesh.faculty@campussathi.ai';
 
 export function seedDemoData() {
+  // Seed demo teacher if not exists
+  const existingTeacher = db.prepare('SELECT id FROM users WHERE id = ?').get(DEMO_TEACHER_ID);
+  if (!existingTeacher) {
+    const teacherHash = crypto.createHash('sha256').update('faculty123').digest('hex');
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, email, password_hash, name, role, college, course, year, semester)
+      VALUES (?, ?, ?, ?, 'teacher', ?, 'Computer Science & Engineering', 'Faculty', 'Faculty')
+    `).run(
+      DEMO_TEACHER_ID,
+      DEMO_TEACHER_EMAIL,
+      teacherHash,
+      'Dr. Rajesh Sharma',
+      'IIIT Delhi'
+    );
+    db.prepare(`
+      INSERT OR IGNORE INTO profiles (user_id, avatar, accent_color, theme, default_language, daily_goal_minutes, xp, level, streak_days, longest_streak)
+      VALUES (?, '👨‍🏫', 'indigo', 'light', 'en', 60, 1850, 6, 14, 21)
+    `).run(DEMO_TEACHER_ID);
+  }
+
   const existingUser = db.prepare('SELECT id FROM users WHERE id = ?').get(DEMO_USER_ID);
   if (existingUser) {
+    // Ensure role is set to student
+    db.prepare("UPDATE users SET role = 'student' WHERE id = ? AND (role IS NULL OR role = '')").run(DEMO_USER_ID);
     return; // Already seeded
   }
 
   console.log('Seeding CampusSathi AI demo data for Ankit...');
 
-  // 1. Create demo user
+  // 1. Create demo student user
   const passwordHash = crypto.createHash('sha256').update('password123').digest('hex');
   db.prepare(`
-    INSERT INTO users (id, email, password_hash, name, college, course, year, semester)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (id, email, password_hash, name, role, college, course, year, semester)
+    VALUES (?, ?, ?, ?, 'student', ?, ?, ?, ?)
   `).run(
     DEMO_USER_ID,
     DEMO_EMAIL,
