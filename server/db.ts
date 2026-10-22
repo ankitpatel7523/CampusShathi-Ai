@@ -10,6 +10,7 @@ if (!fs.existsSync(dataDir)) {
 const dbPath = path.join(dataDir, 'campussathi.db');
 export const db = new DatabaseSync(dbPath);
 
+// Initialize database tables
 export function initDb() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS meta (
@@ -26,10 +27,7 @@ export function initDb() {
       course TEXT DEFAULT '',
       year TEXT DEFAULT '1st Year',
       semester TEXT DEFAULT 'Sem 1',
-      role TEXT DEFAULT 'student',
-      is_verified INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS profiles (
@@ -39,11 +37,10 @@ export function initDb() {
       theme TEXT DEFAULT 'light',
       default_language TEXT DEFAULT 'en',
       daily_goal_minutes INTEGER DEFAULT 45,
-      xp INTEGER DEFAULT 0,
+      xp INTEGER DEFAULT 120,
       level INTEGER DEFAULT 1,
-      streak_days INTEGER DEFAULT 0,
-      longest_streak INTEGER DEFAULT 0,
-      campus_coins INTEGER DEFAULT 0,
+      streak_days INTEGER DEFAULT 3,
+      longest_streak INTEGER DEFAULT 5,
       last_active_date TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
@@ -330,30 +327,17 @@ export function initDb() {
       FOREIGN KEY (class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
       FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
     );
-
-    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-    CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
-    CREATE INDEX IF NOT EXISTS idx_chunks_user_doc ON chunks(user_id, document_id);
-    CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts(user_id);
-    CREATE INDEX IF NOT EXISTS idx_flashcards_user_due ON flashcards(user_id, due_date);
-    CREATE INDEX IF NOT EXISTS idx_plans_user ON plans(user_id);
   `);
 
   try {
     db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'student';`);
   } catch {
-    // no-op: column already exists
+    // Column already exists
   }
 
   try {
-    db.exec(`ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0;`);
+    db.exec(`ALTER TABLE profiles ADD COLUMN campus_coins INTEGER DEFAULT 150;`);
   } catch {
-    // no-op
-  }
-
-  try {
-    db.exec(`ALTER TABLE profiles ADD COLUMN campus_coins INTEGER DEFAULT 0;`);
-  } catch {
-    // no-op
+    // Column already exists
   }
 }
